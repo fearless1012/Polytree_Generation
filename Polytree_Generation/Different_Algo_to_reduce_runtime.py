@@ -99,31 +99,30 @@ def Is_Polytree(G, intermediary_nodes):
         return False
 
 
-def create_polytree_with_e(G, possible_edges, intermediary_nodes, graphs, visited):
-    # Edges_to_consider = []
-    # for any_edge in possible_edges:
-    #     if e[0] in any_edge or e[1] in any_edge:
-    #         Edges_to_consider.append(any_edge)
-    # Edges_to_consider.remove(e)
-    # print(possible_edges)
+def create_polytree_with_e(G, e, possible_edges, intermediary_nodes, graphs, visited):
+    # print(e)
+    Edges_to_consider = []
+    for any_edge in possible_edges:
+        if e[0] in any_edge or e[1] in any_edge:
+            Edges_to_consider.append(any_edge)
 
-    for edge in possible_edges:
+    for edge in Edges_to_consider:
         if edge[0] not in G.nodes[edge[1]]['connections'] and G.in_degree(edge[1]) < 2:
-            print("Adding")
-            print(edge)
-            print(visited)
-            visited.append(edge)
+            # print("Adding")
+            # print(edge)
             # print(visited)
+            visited.append(edge)
             add_edge_to_polytree(G, edge[0], edge[1])
-            create_polytree_with_e(G, possible_edges, intermediary_nodes, graphs, visited)
-            print("Removing")
-            print(edge)
+            create_polytree_with_e(G, edge, possible_edges, intermediary_nodes, graphs, visited)
+            # print("Removing")
+            # print(edge)
             visited.remove(edge)
             remove_edge_from_polytree(G, edge[0], edge[1])
 
     if Is_Polytree(G, intermediary_nodes) and str(sorted(visited)) not in graphs:
         graphs.append(str(sorted(visited)))
-        input()
+        # print(len(graphs))
+        # print(visited)
         # nx.draw(G, with_labels=True, font_weight='bold')
         # plt.show()
         # print(graphs)
@@ -133,53 +132,52 @@ def generate_all_polytrees(input_nodes, output_nodes):
     # Max number of output nodes in a polytree would be m+n-2
     max_intermediary_nodes = len(input_nodes) + len(output_nodes) - 1
 
-    # for int_node_count in range(max_intermediary_nodes):
+    for int_node_count in range(max_intermediary_nodes):
 
-    int_node_count = 3
+        intermediary_nodes = list(range(input_nodes_count + output_nodes_count + 1,
+                                        input_nodes_count + output_nodes_count + int_node_count + 1))
 
-    intermediary_nodes = list(range(input_nodes_count + output_nodes_count + 1,
-                                    input_nodes_count + output_nodes_count + int_node_count + 1))
+        # Create an empty graph
+        G = nx.DiGraph()
+        G.remove_nodes_from(list(G.nodes()))
 
-    # Create an empty graph
-    G = nx.DiGraph()
-    G.remove_nodes_from(list(G.nodes()))
+        # Add input, output and intermediary nodes to graph
+        for node in input_nodes:
+            G.add_node(node, label='input', connections=set([node]), connections_dict={})
 
-    # Add input, output and intermediary nodes to graph
-    for node in input_nodes:
-        G.add_node(node, label='input', connections=set([node]), connections_dict={})
+        for node in output_nodes:
+            G.add_node(node, label='output', connections=set([node]), connections_dict={})
 
-    for node in output_nodes:
-        G.add_node(node, label='output', connections=set([node]), connections_dict={})
+        for node in intermediary_nodes:
+            G.add_node(node, label='middle', connections=set([node]), connections_dict={})
 
-    for node in intermediary_nodes:
-        G.add_node(node, label='middle', connections=set([node]), connections_dict={})
+        possible_edges = []
+        for i in input_nodes:
+            for o in output_nodes:
+                possible_edges.append([i, o])
 
-    possible_edges = []
-    for i in input_nodes:
-        for o in output_nodes:
-            possible_edges.append([i, o])
+        for i in input_nodes:
+            for m in intermediary_nodes:
+                possible_edges.append([i, m])
 
-    for i in input_nodes:
         for m in intermediary_nodes:
-            possible_edges.append([i, m])
+            for o in output_nodes:
+                possible_edges.append([m, o])
 
-    for m in intermediary_nodes:
-        for o in output_nodes:
-            possible_edges.append([m, o])
+        for m1 in intermediary_nodes:
+            for m2 in intermediary_nodes:
+                if m1 != m2:
+                    possible_edges.append([m1, m2])
 
-    for m1 in intermediary_nodes:
-        for m2 in intermediary_nodes:
-            if m1 != m2:
-                possible_edges.append([m1, m2])
+        print("Number of intermediary nodes: ", int_node_count)
+        print("TotalEdges :", len(possible_edges))
+        # print(possible_edges)
 
-    print(len(possible_edges))
-    print(possible_edges)
-
-    input(int_node_count)
-    graphs = []
-    create_polytree_with_e(G, possible_edges, intermediary_nodes, graphs, [])
-    print(len(graphs))
-    print(graphs)
+        graphs = []
+        create_polytree_with_e(G, possible_edges[0], possible_edges, intermediary_nodes, graphs, [])
+        print("Number of Graphs Formed : ", len(graphs))
+        print("Graphs : ")
+        print(graphs)
 
 
 if __name__ == '__main__':
