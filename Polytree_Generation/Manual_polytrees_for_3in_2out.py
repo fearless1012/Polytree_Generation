@@ -4,42 +4,124 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
+def update_connections(G, node, visited, connections):
+    visited.add(node)
+    component = [node]
+    print(G.neighbors(node))
+    for neighbor in G.neighbors(node):
+        print("here")
+        print(G.neighbors(node))
+        if neighbor not in visited:
+            component.append(update_connections(G, neighbor, visited))
+
+    connections.extend(component)
+    print(connections)
+    return connections
+
+
 def add_edge_to_polytree(G, from_node, to_node):
+    # nx.draw(G, with_labels=True, font_weight='bold')
+    # plt.show()
+    # print(G.nodes[to_node]['connections'])
+    # print(G.nodes[from_node]['connections'])
+
+    # Add the edge
     G.add_edge(from_node, to_node)
+
     # Add all connections of from_node to connections of to_node
     G.nodes[to_node]['connections'] = G.nodes[to_node]['connections'].union(G.nodes[from_node]['connections'])
 
-    # update connections to every other connected node in to_node
+    # update connections to every other connected node in to_node including the newly added connections of from_node
     for connection in G.nodes[to_node]['connections']:
         G.nodes[connection]['connections'] = G.nodes[connection]['connections'].union(
             G.nodes[to_node]['connections'])
 
+    # # update outputs of from_node
+    # G.nodes[from_node]['outputs'].add(to_node)
+    # G.nodes[from_node]['outputs'] = G.nodes[from_node]['outputs'].union(G.nodes[to_node]['outputs'])
+    # for innode in G.nodes[from_node]['inputs']:
+    #     G.nodes[innode]['outputs'] = G.nodes[innode]['outputs'].union(G.nodes[from_node]['outputs'])
+    #
+    # # update inputs of to_node
+    # G.nodes[to_node]['inputs'].add(from_node)
+    # G.nodes[to_node]['inputs'] = G.nodes[to_node]['inputs'].union(G.nodes[from_node]['inputs'])
+    # for outnode in G.nodes[to_node]['outputs']:
+    #     G.nodes[outnode]['inputs'] = G.nodes[outnode]['inputs'].union(G.nodes[to_node]['inputs'])
+
+    # print(G.nodes[to_node]['connections'])
+    # print(G.nodes[from_node]['connections'])
+    #
+    # nx.draw(G, with_labels=True, font_weight='bold')
+    # plt.show()
+
 
 def remove_edge_from_polytree(G, from_node, to_node):
+    # nx.draw(G, with_labels=True, font_weight='bold')
+    # plt.show()
+    # print(G.nodes[to_node]['connections'])
+    # print(G.nodes[from_node]['connections'])
     G.remove_edge(from_node, to_node)
+
+    # update connections of every node in from_node
+    G_temp = G.to_undirected()
+    G.nodes[from_node]['connections'] = nx.node_connected_component(G_temp, from_node)
+    G.nodes[to_node]['connections'] = nx.node_connected_component(G_temp, to_node)
+
+    # print(G.nodes[from_node]['connections'])
+    # print(G.nodes[to_node]['connections'])
+
     for connection in G.nodes[to_node]['connections']:
-        G.nodes[connection]['connections'] = G.nodes[connection]['connections'].difference(
-            G.nodes[from_node]['connections'])
+        G.nodes[connection]['connections'] = G.nodes[to_node]['connections']
+
     for connection in G.nodes[from_node]['connections']:
-        G.nodes[connection]['connections'] = G.nodes[connection]['connections'].difference(
-            G.nodes[to_node]['connections'])
+        G.nodes[connection]['connections'] = G.nodes[from_node]['connections']
+
+    # nx.draw(G, with_labels=True, font_weight='bold')
+    # plt.show()
 
 
-def create_polytree_with_e(G, possible_edges, e):
-    Edges_to_consider = []
-    for any_edge in possible_edges:
-        if e[0] in any_edge or e[1] in any_edge:
-            Edges_to_consider.append(any_edge)
-    Edges_to_consider.remove(e)
+def IsNot_Generalizable(G, intermediary_nodes):
+    for i in intermediary_nodes:
+        if (G.in_degree(i) == 2 and G.out_degree(i) < 1) or (
+                G.in_degree(i) == 1 and G.out_degree(i) < 2) or G.in_degree(i) < 1:
+            return False
+    return True
 
-    for edge in Edges_to_consider:
+
+def Is_Polytree(G, intermediary_nodes):
+    # Fully connected
+    if len(G.nodes[1]['connections']) == len(G.nodes()) and IsNot_Generalizable(G, intermediary_nodes):
+        return True
+    else:
+        return False
+
+
+def create_polytree_with_e(G, possible_edges, intermediary_nodes, graphs, visited):
+    # Edges_to_consider = []
+    # for any_edge in possible_edges:
+    #     if e[0] in any_edge or e[1] in any_edge:
+    #         Edges_to_consider.append(any_edge)
+    # Edges_to_consider.remove(e)
+    # print(possible_edges)
+
+    for edge in possible_edges:
         if edge[0] not in G.nodes[edge[1]]['connections'] and G.in_degree(edge[1]) < 2:
+            print("Adding")
+            print(edge)
+            print(visited)
+            visited.append(edge)
+            print(visited)
             add_edge_to_polytree(G, edge[0], edge[1])
-            create_polytree_with_e(G, possible_edges, edge)
-        elif len(G.nodes[edge[1]]['connections']) == len(G.nodes()):
-            print(len(G.nodes[edge[1]]['connections']), len(G.nodes()))
-            nx.draw(G, with_labels=True, font_weight='bold')
-            plt.show()
+            create_polytree_with_e(G, possible_edges, intermediary_nodes, graphs, visited)
+            print("Removing")
+            print(edge)
+            visited.remove(edge)
+            remove_edge_from_polytree(G, edge[0], edge[1])
+
+    if Is_Polytree(G, intermediary_nodes) and str(sorted(visited)) not in graphs:
+        graphs.append(str(sorted(visited)))
+        nx.draw(G, with_labels=True, font_weight='bold')
+        plt.show()
 
 
 def generate_all_polytrees(input_nodes, output_nodes):
@@ -57,13 +139,13 @@ def generate_all_polytrees(input_nodes, output_nodes):
 
         # Add input, output and intermediary nodes to graph
         for node in input_nodes:
-            G.add_node(node, label='input', connections=set([node]))
+            G.add_node(node, label='input', connections=set([node]), connections_dict={})
 
         for node in output_nodes:
-            G.add_node(node, label='output', connections=set([node]))
+            G.add_node(node, label='output', connections=set([node]), connections_dict={})
 
         for node in intermediary_nodes:
-            G.add_node(node, label='middle', connections=set([node]))
+            G.add_node(node, label='middle', connections=set([node]), connections_dict={})
 
         possible_edges = []
         for i in input_nodes:
@@ -78,18 +160,8 @@ def generate_all_polytrees(input_nodes, output_nodes):
             for o in output_nodes:
                 possible_edges.append([m, o])
 
-        for e in possible_edges:
-            G.remove_edges_from(list(G.edges()))
-            # e is a definite edge in the polytree
-            add_edge_to_polytree(G, e[0], e[1])
-
-            create_polytree_with_e(G, possible_edges, e)
-
-
-def check_for_generalizablity_of_nodes(G, intermediary_nodes):
-    for i in intermediary_nodes:
-        if G.in_degree(i) <= 1 and G.out_degree(i) <= 1:
-            print("generalized node")
+        input(int_node_count)
+        create_polytree_with_e(G, possible_edges, intermediary_nodes, [], [])
 
 
 if __name__ == '__main__':
